@@ -87,10 +87,31 @@ st.markdown("<p style='color: #B2B5BE; margin-top: -15px;'>Handshake AI Showcase
 
 # 1. Financial Asset Data Registry
 ASSETS = {
+    # --- Precious Metals ---
     "Gold (Commodity)": "GC=F",
-    "Ethereum (ETH-USD)": "ETH-USD",
+    "Silver (Commodity)": "SI=F",
+    "Platinum (Commodity)": "PL=F",
+    "Palladium (Commodity)": "PA=F",
+    "Copper (Commodity)": "HG=F",
+    # --- Energy ---
+    "Crude Oil WTI (Commodity)": "CL=F",
+    "Crude Oil Brent (Commodity)": "BZ=F",
+    "Natural Gas (Commodity)": "NG=F",
+    "Gasoline RBOB (Commodity)": "RB=F",
+    "Heating Oil (Commodity)": "HO=F",
+    # --- Agriculture ---
+    "Corn (Commodity)": "ZC=F",
+    "Wheat (Commodity)": "ZW=F",
+    "Soybeans (Commodity)": "ZS=F",
+    "Coffee (Commodity)": "KC=F",
+    "Sugar (Commodity)": "SB=F",
+    "Cotton (Commodity)": "CT=F",
+    "Cocoa (Commodity)": "CC=F",
+    "Live Cattle (Commodity)": "LE=F",
+    # --- Crypto ---
     "Bitcoin (BTC-USD)": "BTC-USD",
-    "Crude Oil (Commodity)": "CL=F",
+    "Ethereum (ETH-USD)": "ETH-USD",
+    # --- Equities & Indices ---
     "S&P 500 Index": "^GSPC",
     "Nvidia (NVDA)": "NVDA",
     "Apple (AAPL)": "AAPL",
