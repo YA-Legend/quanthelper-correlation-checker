@@ -76,10 +76,39 @@ st.set_page_config(page_title="QuantHelper | Asset Correlation", layout="wide")
 # computed and is instructed to interpret the data (not invent causes),
 # with explicit statistical caveats. Cached so reruns don't burn quota.
 @st.cache_data(show_spinner=False, ttl=3600)
+def resolve_model(api_key):
+    # Auto-detect a currently available generateContent model so the app
+    # doesn't break each time Google retires a model name. Prefer the
+    # cheapest flash-lite tier, then fall back gracefully.
+    genai.configure(api_key=api_key)
+    available = []
+    for m in genai.list_models():
+        methods = getattr(m, "supported_generation_methods", []) or []
+        if "generateContent" in methods:
+            available.append(m.name.replace("models/", ""))
+    preferences = [
+        "gemini-3.1-flash-lite", "gemini-3-flash", "gemini-3.5-flash",
+        "gemini-flash-latest", "gemini-2.5-flash",
+    ]
+    for p in preferences:
+        if p in available:
+            return p
+    for a in available:
+        if "flash" in a and "lite" in a:
+            return a
+    for a in available:
+        if "flash" in a:
+            return a
+    if available:
+        return available[0]
+    raise RuntimeError("No generateContent-capable model is available for this API key.")
+
+
+@st.cache_data(show_spinner=False, ttl=3600)
 def generate_ai_analysis(api_key, asset_a, asset_b, corr, p_value, n_obs,
                          roll_latest, roll_min, roll_max, roll_window):
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel("gemini-2.5-flash-lite")
+    model = genai.GenerativeModel(resolve_model(api_key))
     sig = "statistically significant" if p_value < 0.05 else "NOT statistically significant"
     prompt = f"""You are a careful quantitative analyst. You are given ONLY the computed statistics below,
 describing the DAILY RETURN relationship between two assets over a lookback window.
