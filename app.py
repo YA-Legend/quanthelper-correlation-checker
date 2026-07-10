@@ -236,7 +236,7 @@ try:
             if n_obs < 3 or returns['Asset1'].std() == 0 or returns['Asset2'].std() == 0:
                 correlation_value, p_value = float('nan'), float('nan')
             else:
-                correlation_value = float(np.corrcoef(returns['Asset1'], returns['Asset2'])[0, 1])
+                correlation_value = float(returns['Asset1'].corr(returns['Asset2']))
                 p_value = pearson_p_value(correlation_value, n_obs)
 
             is_significant = (not pd.isna(p_value)) and p_value < 0.05
@@ -298,16 +298,22 @@ try:
                 
             with chart_tab2:
                 # Scatter of DAILY RETURNS — the correct visual for correlation.
-                ret_pct = returns * 100
-                x_data = ret_pct['Asset1'].values
-                y_data = ret_pct['Asset2'].values
+                # Build from a DataFrame (proven-stable plotly path) rather than
+                # passing raw arrays to px.scatter.
+                x_col = f'{asset_1_label} Daily Return (%)'
+                y_col = f'{asset_2_label} Daily Return (%)'
+                scatter_df = pd.DataFrame({
+                    x_col: returns['Asset1'].values * 100,
+                    y_col: returns['Asset2'].values * 100,
+                })
                 
-                fig2 = px.scatter(x=x_data, y=y_data,
+                fig2 = px.scatter(scatter_df, x=x_col, y=y_col,
                                   color_discrete_sequence=["#29B6F6"],
-                                  labels={'x': f'{asset_1_label} Daily Return (%)', 'y': f'{asset_2_label} Daily Return (%)'},
                                   title="Daily Return Distribution & OLS Fit")
                 
                 # OLS trendline over the return cloud
+                x_data = scatter_df[x_col].values
+                y_data = scatter_df[y_col].values
                 if len(x_data) >= 2 and np.std(x_data) > 0:
                     slope, intercept = np.polyfit(x_data, y_data, 1)
                     x_trend = np.array([x_data.min(), x_data.max()])
@@ -323,20 +329,30 @@ try:
 
             with chart_tab3:
                 # Rolling correlation exposes regime shifts a single number hides.
+                # Computed with a manual window loop over Series.corr (stable path)
+                # instead of rolling().corr().
                 roll_window = int(min(30, max(5, n_obs // 3)))
-                rolling_corr = returns['Asset1'].rolling(roll_window).corr(returns['Asset2']).dropna()
+                roll_col = f'{roll_window}-Day Rolling r'
+                a1 = returns['Asset1']
+                a2 = returns['Asset2']
+                roll_vals = []
+                for end in range(roll_window, n_obs + 1):
+                    seg1 = a1.iloc[end - roll_window:end]
+                    seg2 = a2.iloc[end - roll_window:end]
+                    roll_vals.append(seg1.corr(seg2))
+                roll_index = returns.index[roll_window - 1:]
+                rolling_df = pd.DataFrame({roll_col: roll_vals}, index=roll_index).dropna()
 
-                if rolling_corr.empty:
+                if rolling_df.empty:
                     st.info("Not enough overlapping data to compute a rolling correlation. Widen the window.")
                 else:
-                    fig3 = px.line(x=rolling_corr.index, y=rolling_corr.values,
+                    fig3 = px.line(rolling_df, y=roll_col,
                                    color_discrete_sequence=["#29B6F6"],
-                                   labels={'x': '', 'y': f'{roll_window}-Day Rolling r'},
                                    title=f"{roll_window}-Day Rolling Return Correlation")
                     fig3.add_hline(y=0, line_dash="dash", line_color="#78909C")
                     fig3.update_yaxes(range=[-1, 1], gridcolor='#232733', linecolor='#2A2E39')
                     fig3.update_xaxes(gridcolor='#232733', linecolor='#2A2E39')
-                    fig3.update_layout(hovermode="x unified", **global_chart_layout)
+                    fig3.update_layout(hovermode="x unified", showlegend=False, **global_chart_layout)
                     st.plotly_chart(fig3, width="stretch")
                     st.caption("Correlation is not static — it shifts across market regimes. A flat single number can hide this instability.")
             
