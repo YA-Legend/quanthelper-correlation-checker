@@ -2,10 +2,71 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import numpy as np
+import math
 import plotly.express as px
 import plotly.graph_objects as go
-from scipy import stats
 import google.generativeai as genai
+
+
+def _betacf(a, b, x):
+    # Continued-fraction evaluation for the incomplete beta function.
+    MAXIT, EPS, FPMIN = 200, 3.0e-12, 1.0e-30
+    qab, qap, qam = a + b, a + 1.0, a - 1.0
+    c = 1.0
+    d = 1.0 - qab * x / qap
+    if abs(d) < FPMIN:
+        d = FPMIN
+    d = 1.0 / d
+    h = d
+    for m in range(1, MAXIT + 1):
+        m2 = 2 * m
+        aa = m * (b - m) * x / ((qam + m2) * (a + m2))
+        d = 1.0 + aa * d
+        if abs(d) < FPMIN:
+            d = FPMIN
+        c = 1.0 + aa / c
+        if abs(c) < FPMIN:
+            c = FPMIN
+        d = 1.0 / d
+        h *= d * c
+        aa = -(a + m) * (qab + m) * x / ((a + m2) * (qap + m2))
+        d = 1.0 + aa * d
+        if abs(d) < FPMIN:
+            d = FPMIN
+        c = 1.0 + aa / c
+        if abs(c) < FPMIN:
+            c = FPMIN
+        d = 1.0 / d
+        delta = d * c
+        h *= delta
+        if abs(delta - 1.0) < EPS:
+            break
+    return h
+
+
+def _betai(a, b, x):
+    # Regularized incomplete beta function I_x(a, b).
+    if x <= 0.0:
+        return 0.0
+    if x >= 1.0:
+        return 1.0
+    lbeta = math.lgamma(a + b) - math.lgamma(a) - math.lgamma(b)
+    front = math.exp(lbeta + a * math.log(x) + b * math.log(1.0 - x))
+    if x < (a + 1.0) / (a + b + 2.0):
+        return front * _betacf(a, b, x) / a
+    return 1.0 - front * _betacf(b, a, 1.0 - x) / b
+
+
+def pearson_p_value(r, n):
+    # Two-sided p-value for a Pearson correlation via the Student's t
+    # distribution — equivalent to scipy.stats.pearsonr, no scipy needed.
+    if n <= 2 or pd.isna(r):
+        return float('nan')
+    if abs(r) >= 1.0:
+        return 0.0
+    df = n - 2
+    t_sq = (r * r) * df / (1.0 - r * r)
+    return _betai(0.5 * df, 0.5, df / (df + t_sq))
 
 # Page configuration initialized first
 st.set_page_config(page_title="QuantHelper | Asset Correlation", layout="wide")
@@ -175,7 +236,8 @@ try:
             if n_obs < 3 or returns['Asset1'].std() == 0 or returns['Asset2'].std() == 0:
                 correlation_value, p_value = float('nan'), float('nan')
             else:
-                correlation_value, p_value = stats.pearsonr(returns['Asset1'], returns['Asset2'])
+                correlation_value = float(np.corrcoef(returns['Asset1'], returns['Asset2'])[0, 1])
+                p_value = pearson_p_value(correlation_value, n_obs)
 
             is_significant = (not pd.isna(p_value)) and p_value < 0.05
 
