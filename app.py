@@ -223,26 +223,29 @@ try:
                 """)
                 st.latex(r"r = \frac{\sum (X - \bar{X})(Y - \bar{Y})}{\sqrt{\sum (X - \bar{X})^2 \sum (Y - \bar{Y})^2}}")
 
-            # 7. Safe Key Interception Layer to Stop Crashing
+            # 7. Modern AI Core Engine Layer
             st.write("---")
             st.subheader("🤖 AI Macroeconomic Analysis")
-            
-            try:
-                if hasattr(st, "secrets") and "GENAI_API_KEY" in st.secrets:
+
+            # Directly read from st.secrets without the restrictive if/else trap
+            if hasattr(st, "secrets") and "GENAI_API_KEY" in st.secrets:
+                try:
+                    # Using the updated direct payload initialization
                     genai.configure(api_key=st.secrets["GENAI_API_KEY"])
                     model = genai.GenerativeModel("gemini-1.5-flash")
-                    
+
                     prompt = (f"Analyze the financial relationship between {asset_1_label} and {asset_2_label}. "
                               f"The Pearson correlation coefficient over this period is {correlation_value:.2f}. "
                               f"Provide a brief 3-sentence macroeconomic explanation of why they might behave this way.")
-                    
+
                     with st.spinner("Executing analytical processing..."):
                         response = model.generate_content(prompt)
                         st.markdown(f"<div style='color: #D1D4DC; line-height: 1.6;'>{response.text}</div>", unsafe_allow_html=True)
-                else:
-                    st.info("💡 Local Terminal Engine Active. Complete deployment setup to link your Google AI Plus API Key inside Handshake's environment settings.")
-            except Exception:
-                st.info("💡 Local Terminal Engine Active. Complete deployment setup to link your Google AI Plus API Key inside Handshake's environment settings.")
+                except Exception as ai_err:
+                    # This will print the EXACT error on the screen so we can squash it instantly
+                    st.error(f"AI Engine Operational Exception: {ai_err}")
+            else:
+                st.info("💡 API Key Status: Missing 'GENAI_API_KEY' inside Streamlit Secrets panel.")
 
 except Exception as e:
     st.error(f"Critical System Interruption: {e}")
