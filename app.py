@@ -3,6 +3,7 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 import math
+import re
 import plotly.express as px
 import plotly.graph_objects as go
 import google.generativeai as genai
@@ -126,10 +127,11 @@ Computed statistics:
 - Two-sided p-value: {p_value:.4f} ({sig})
 - Rolling {roll_window}-day correlation — latest: {roll_latest:.2f}, min: {roll_min:.2f}, max: {roll_max:.2f}
 
-Write exactly 3 short sentences:
-1) The strength and direction of the correlation, and whether it is significant given n.
-2) How stable the relationship has been, based on the rolling min/max/latest range.
-3) One concrete statistical caveat a reader should keep in mind.
+Write exactly 3 short points, each on its own line. Do NOT number them and do NOT add bullet
+characters — just plain text, one point per line:
+- The strength and direction of the correlation, and whether it is significant given n.
+- How stable the relationship has been, based on the rolling min/max/latest range.
+- One concrete statistical caveat a reader should keep in mind.
 """
     response = model.generate_content(prompt)
     return response.text
@@ -454,13 +456,17 @@ try:
                             float(rolling_df[roll_col].max()),
                             int(roll_window),
                         )
-                    st.markdown(f"<div style='color: #D1D4DC; line-height: 1.6;'>{analysis_text}</div>", unsafe_allow_html=True)
+                    # Split into individual points, stripping any numbering or
+                    # bullet markers the model may add, then render one per line.
+                    raw_points = re.split(r'\n+|(?<![\d.])\d{1,2}[\).]\s+', analysis_text.strip())
+                    points = [re.sub(r'^[\-\u2022\s]+', '', p).strip() for p in raw_points]
+                    points = [p for p in points if p]
+                    st.markdown("\n".join(f"- {p}" for p in points))
                 except Exception as ai_err:
                     if "429" in str(ai_err) or "quota" in str(ai_err).lower():
                         st.warning("⏳ AI quota reached for now. Interpretation will return once quota resets.")
                     else:
                         st.warning("AI interpretation is temporarily unavailable.")
-                        st.caption(f"Debug (temporary): {ai_err}")
             else:
                 st.info("💡 AI interpretation is offline (no API key configured). The statistics above are complete on their own.")
 
