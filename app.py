@@ -5,7 +5,6 @@ import numpy as np
 import math
 import plotly.express as px
 import plotly.graph_objects as go
-import google.generativeai as genai
 
 
 def _betacf(a, b, x):
@@ -71,21 +70,6 @@ def pearson_p_value(r, n):
 # Page configuration initialized first
 st.set_page_config(page_title="QuantHelper | Asset Correlation", layout="wide")
 
-
-# Cache AI output so slider/rerun churn doesn't burn through API quota.
-# Result is keyed by the asset pair and rounded correlation, so identical
-# requests are served from cache instead of hitting the API again.
-@st.cache_data(show_spinner=False, ttl=3600)
-def generate_ai_analysis(api_key: str, asset_a: str, asset_b: str, corr: float) -> str:
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel("gemini-2.0-flash")
-    prompt = (f"Analyze the financial relationship between {asset_a} and {asset_b}. "
-              f"Their DAILY RETURN correlation (Pearson r) over this period is {corr:.2f}. "
-              f"In 3 sentences, give a grounded macroeconomic explanation of this return co-movement, "
-              f"and note one factor that could cause the correlation to break down. Avoid overstating certainty.")
-    response = model.generate_content(prompt)
-    return response.text
-
 # FINANCIAL TERMINAL STYLE INJECTION (TradingView Charcoal Theme)
 st.markdown("""
     <style>
@@ -146,7 +130,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("QuantHelper: Return Correlation Explorer")
-st.markdown("<p style='color: #B2B5BE; margin-top: -15px;'>Correlation of daily returns across commodities, indices & crypto — with significance testing and rolling stability. Built with Streamlit + Gemini.</p>", unsafe_allow_html=True)
+st.markdown("<p style='color: #B2B5BE; margin-top: -15px;'>Correlation of daily returns across commodities, indices & crypto — with significance testing and rolling stability. Built with Python & Streamlit.</p>", unsafe_allow_html=True)
 
 # 1. Financial Asset Data Registry
 ASSETS = {
@@ -384,33 +368,6 @@ try:
                 Pearson $r$ computed on daily percentage returns $r_{i,t}$:
                 """)
                 st.latex(r"\rho = \frac{\sum (r_{1,t} - \bar{r}_1)(r_{2,t} - \bar{r}_2)}{\sqrt{\sum (r_{1,t} - \bar{r}_1)^2 \sum (r_{2,t} - \bar{r}_2)^2}}")
-
-            # 7. Modern AI Core Engine Layer
-            st.write("---")
-            st.subheader("🤖 AI Macroeconomic Analysis")
-
-            # Directly read from st.secrets without the restrictive if/else trap
-            if pd.isna(correlation_value):
-                st.info("💡 Correlation could not be computed for this pair/window, so no AI analysis was generated.")
-            elif hasattr(st, "secrets") and "GENAI_API_KEY" in st.secrets:
-                try:
-                    with st.spinner("Executing analytical processing..."):
-                        analysis_text = generate_ai_analysis(
-                            st.secrets["GENAI_API_KEY"],
-                            asset_1_label,
-                            asset_2_label,
-                            round(correlation_value, 2),
-                        )
-                    st.markdown(f"<div style='color: #D1D4DC; line-height: 1.6;'>{analysis_text}</div>", unsafe_allow_html=True)
-                except Exception as ai_err:
-                    # Rate limit / quota exhaustion returns HTTP 429
-                    if "429" in str(ai_err) or "quota" in str(ai_err).lower():
-                        st.warning("⏳ AI engine is cooling down — the free-tier request quota was reached. "
-                                   "Please wait a minute and rerun, or enable billing on your Google AI project for higher limits.")
-                    else:
-                        st.error(f"AI Engine Operational Exception: {ai_err}")
-            else:
-                st.info("💡 API Key Status: Missing 'GENAI_API_KEY' inside Streamlit Secrets panel.")
 
 except Exception as e:
     st.error(f"Critical System Interruption: {e}")
