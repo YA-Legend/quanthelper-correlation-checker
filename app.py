@@ -360,20 +360,23 @@ try:
             st.write("---")
             st.subheader("📋 Methodology & Computational Specifications")
             
+            sig_txt = "not enough data" if pd.isna(p_value) else (
+                f"significant (p = {p_value:.3f})" if is_significant else f"not significant (p = {p_value:.3f})")
             m_col1, m_col2, m_col3 = st.columns(3)
             with m_col1:
                 st.markdown(f"""
                 **Data & Source**
                 * Source: Yahoo Finance (daily EOD).
                 * Prices: Adjusted close (splits/dividends).
-                * Alignment: Inner join on shared trading days.
+                * Alignment: Inner join on shared trading sessions.
                 """)
             with m_col2:
                 st.markdown(f"""
                 **Method**
                 * Input: **Daily returns**, not price levels — avoids spurious correlation from shared trends.
-                * Window: `{days_window} calendar days` of data.
-                * Significance: two-sided p-value on Pearson $r$.
+                * Window: last `{len(df_filtered)}` trading sessions → `{n_obs}` return observations.
+                * Rolling view: `{roll_window}`-session window to expose regime shifts.
+                * Significance: two-sided p-value on Pearson $r$ — currently {sig_txt}.
                 """)
             with m_col3:
                 st.markdown("""
