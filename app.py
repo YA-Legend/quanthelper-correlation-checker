@@ -171,7 +171,7 @@ try:
                 fig1.update_layout(hovermode="x unified", **global_chart_layout)
                 fig1.update_xaxes(gridcolor='#232733', linecolor='#2A2E39')
                 fig1.update_yaxes(gridcolor='#232733', linecolor='#2A2E39')
-                st.plotly_chart(fig1, use_container_width=True)
+                st.plotly_chart(fig, width="stretch")
                 
             with chart_tab2:
                 # Build unified scale coordinate arrays to eliminate scale distortions
