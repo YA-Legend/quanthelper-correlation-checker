@@ -9,6 +9,20 @@ import google.generativeai as genai
 # Page configuration initialized first
 st.set_page_config(page_title="QuantHelper | Asset Correlation", layout="wide")
 
+
+# Cache AI output so slider/rerun churn doesn't burn through API quota.
+# Result is keyed by the asset pair and rounded correlation, so identical
+# requests are served from cache instead of hitting the API again.
+@st.cache_data(show_spinner=False, ttl=3600)
+def generate_ai_analysis(api_key: str, asset_a: str, asset_b: str, corr: float) -> str:
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel("gemini-2.0-flash")
+    prompt = (f"Analyze the financial relationship between {asset_a} and {asset_b}. "
+              f"The Pearson correlation coefficient over this period is {corr:.2f}. "
+              f"Provide a brief 3-sentence macroeconomic explanation of why they might behave this way.")
+    response = model.generate_content(prompt)
+    return response.text
+
 # FINANCIAL TERMINAL STYLE INJECTION (TradingView Charcoal Theme)
 st.markdown("""
     <style>
@@ -230,20 +244,21 @@ try:
             # Directly read from st.secrets without the restrictive if/else trap
             if hasattr(st, "secrets") and "GENAI_API_KEY" in st.secrets:
                 try:
-                    # Using the updated direct payload initialization
-                    genai.configure(api_key=st.secrets["GENAI_API_KEY"])
-                    model = genai.GenerativeModel("gemini-2.0-flash")
-
-                    prompt = (f"Analyze the financial relationship between {asset_1_label} and {asset_2_label}. "
-                              f"The Pearson correlation coefficient over this period is {correlation_value:.2f}. "
-                              f"Provide a brief 3-sentence macroeconomic explanation of why they might behave this way.")
-
                     with st.spinner("Executing analytical processing..."):
-                        response = model.generate_content(prompt)
-                        st.markdown(f"<div style='color: #D1D4DC; line-height: 1.6;'>{response.text}</div>", unsafe_allow_html=True)
+                        analysis_text = generate_ai_analysis(
+                            st.secrets["GENAI_API_KEY"],
+                            asset_1_label,
+                            asset_2_label,
+                            round(correlation_value, 2),
+                        )
+                    st.markdown(f"<div style='color: #D1D4DC; line-height: 1.6;'>{analysis_text}</div>", unsafe_allow_html=True)
                 except Exception as ai_err:
-                    # This will print the EXACT error on the screen so we can squash it instantly
-                    st.error(f"AI Engine Operational Exception: {ai_err}")
+                    # Rate limit / quota exhaustion returns HTTP 429
+                    if "429" in str(ai_err) or "quota" in str(ai_err).lower():
+                        st.warning("⏳ AI engine is cooling down — the free-tier request quota was reached. "
+                                   "Please wait a minute and rerun, or enable billing on your Google AI project for higher limits.")
+                    else:
+                        st.error(f"AI Engine Operational Exception: {ai_err}")
             else:
                 st.info("💡 API Key Status: Missing 'GENAI_API_KEY' inside Streamlit Secrets panel.")
 
