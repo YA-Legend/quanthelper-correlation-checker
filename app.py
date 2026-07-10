@@ -431,6 +431,7 @@ try:
                         st.warning("⏳ AI quota reached for now. Interpretation will return once quota resets.")
                     else:
                         st.warning("AI interpretation is temporarily unavailable.")
+                        st.caption(f"Debug (temporary): {ai_err}")
             else:
                 st.info("💡 AI interpretation is offline (no API key configured). The statistics above are complete on their own.")
 
