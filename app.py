@@ -196,7 +196,7 @@ try:
                 fig2.update_layout(**global_chart_layout)
                 fig2.update_xaxes(gridcolor='#232733', linecolor='#2A2E39')
                 fig2.update_yaxes(gridcolor='#232733', linecolor='#2A2E39')
-                st.plotly_chart(fig2, use_container_width=True)
+                st.plotly_chart(fig2, width="stretch")
             
             # 6. Technical Methodology Block
             st.write("---")
