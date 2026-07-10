@@ -232,7 +232,7 @@ try:
                 try:
                     # Using the updated direct payload initialization
                     genai.configure(api_key=st.secrets["GENAI_API_KEY"])
-                    model = genai.GenerativeModel("gemini-1.5-flash")
+                    model = genai.GenerativeModel("gemini-2.0-flash")
 
                     prompt = (f"Analyze the financial relationship between {asset_1_label} and {asset_2_label}. "
                               f"The Pearson correlation coefficient over this period is {correlation_value:.2f}. "
