@@ -5,6 +5,7 @@ import numpy as np
 import math
 import plotly.express as px
 import plotly.graph_objects as go
+import google.generativeai as genai
 
 
 def _betacf(a, b, x):
@@ -70,6 +71,40 @@ def pearson_p_value(r, n):
 # Page configuration initialized first
 st.set_page_config(page_title="QuantHelper | Asset Correlation", layout="wide")
 
+
+# Data-grounded AI interpreter. It is fed ONLY the statistics we already
+# computed and is instructed to interpret the data (not invent causes),
+# with explicit statistical caveats. Cached so reruns don't burn quota.
+@st.cache_data(show_spinner=False, ttl=3600)
+def generate_ai_analysis(api_key, asset_a, asset_b, corr, p_value, n_obs,
+                         roll_latest, roll_min, roll_max, roll_window):
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel("gemini-2.5-flash-lite")
+    sig = "statistically significant" if p_value < 0.05 else "NOT statistically significant"
+    prompt = f"""You are a careful quantitative analyst. You are given ONLY the computed statistics below,
+describing the DAILY RETURN relationship between two assets over a lookback window.
+
+Your job is to INTERPRET what these numbers show. Follow these rules strictly:
+- Do NOT invent macroeconomic causes, news, or any external facts not present in the data.
+- Do NOT claim causation — this is correlation of returns only.
+- Be precise and plain. No hype, no filler.
+
+Computed statistics:
+- Asset A: {asset_a}
+- Asset B: {asset_b}
+- Daily return observations (n): {n_obs}
+- Return correlation (Pearson r): {corr:.3f}
+- Two-sided p-value: {p_value:.4f} ({sig})
+- Rolling {roll_window}-day correlation — latest: {roll_latest:.2f}, min: {roll_min:.2f}, max: {roll_max:.2f}
+
+Write exactly 3 short sentences:
+1) The strength and direction of the correlation, and whether it is significant given n.
+2) How stable the relationship has been, based on the rolling min/max/latest range.
+3) One concrete statistical caveat a reader should keep in mind.
+"""
+    response = model.generate_content(prompt)
+    return response.text
+
 # FINANCIAL TERMINAL STYLE INJECTION (TradingView Charcoal Theme)
 st.markdown("""
     <style>
@@ -130,7 +165,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("QuantHelper: Return Correlation Explorer")
-st.markdown("<p style='color: #B2B5BE; margin-top: -15px;'>Correlation of daily returns across commodities, indices & crypto — with significance testing and rolling stability. Built with Python & Streamlit.</p>", unsafe_allow_html=True)
+st.markdown("<p style='color: #B2B5BE; margin-top: -15px;'>Correlation of daily returns across commodities, indices & crypto — with significance testing, rolling stability, and grounded AI interpretation. Built with Python, Streamlit & Gemini.</p>", unsafe_allow_html=True)
 
 # 1. Financial Asset Data Registry
 ASSETS = {
@@ -368,6 +403,36 @@ try:
                 Pearson $r$ computed on daily percentage returns $r_{i,t}$:
                 """)
                 st.latex(r"\rho = \frac{\sum (r_{1,t} - \bar{r}_1)(r_{2,t} - \bar{r}_2)}{\sqrt{\sum (r_{1,t} - \bar{r}_1)^2 \sum (r_{2,t} - \bar{r}_2)^2}}")
+
+            # 7. Data-Grounded AI Interpretation
+            st.write("---")
+            st.subheader("🤖 AI Data Interpretation")
+            st.caption("Gemini interprets the computed statistics above — it is given only the numbers, "
+                       "not asked to invent causes. Correlation is not causation.")
+
+            has_rolling = ('rolling_df' in dir()) and (not rolling_df.empty)
+            if pd.isna(correlation_value) or pd.isna(p_value) or not has_rolling:
+                st.info("Not enough data to generate a grounded interpretation for this pair/window.")
+            elif hasattr(st, "secrets") and "GENAI_API_KEY" in st.secrets:
+                try:
+                    with st.spinner("Interpreting the statistics..."):
+                        analysis_text = generate_ai_analysis(
+                            st.secrets["GENAI_API_KEY"],
+                            asset_1_label, asset_2_label,
+                            float(correlation_value), float(p_value), int(n_obs),
+                            float(rolling_df[roll_col].iloc[-1]),
+                            float(rolling_df[roll_col].min()),
+                            float(rolling_df[roll_col].max()),
+                            int(roll_window),
+                        )
+                    st.markdown(f"<div style='color: #D1D4DC; line-height: 1.6;'>{analysis_text}</div>", unsafe_allow_html=True)
+                except Exception as ai_err:
+                    if "429" in str(ai_err) or "quota" in str(ai_err).lower():
+                        st.warning("⏳ AI quota reached for now. Interpretation will return once quota resets.")
+                    else:
+                        st.warning("AI interpretation is temporarily unavailable.")
+            else:
+                st.info("💡 AI interpretation is offline (no API key configured). The statistics above are complete on their own.")
 
 except Exception as e:
     st.error(f"Critical System Interruption: {e}")
